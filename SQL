@@ -1,0 +1,122 @@
+use capstone;
+
+-- average number of products used by customers who have a credit card
+SELECT AVG(NumOfProducts)
+FROM capstones
+WHERE HasCrCard = 1;
+
+-- Identify Top 5 customers with highest salary
+
+SELECT CustomerID, surName, EstimatedSalary
+FROM capstones
+ORDER BY EstimatedSalary DESC
+LIMIT 5;
+
+
+-- Compare the average credit score of customers who have exited and those who remain. 
+
+SELECT
+  AVG(CreditScore) AS AvgCreditScoreExited,
+  (SELECT AVG(CreditScore) FROM capstones WHERE IsActiveMember = 1) AS AvgCreditScoreActive
+FROM capstones
+WHERE IsActiveMember = 0;
+
+-- Which gender has a higher average estimated salary, and how does it relate to the number of active accounts? (SQL)
+
+SELECT
+  GenderID,
+  AVG(EstimatedSalary) AS AvgEstimatedSalary,
+  COUNT(*) AS NumActiveAccounts
+FROM capstones
+WHERE IsActiveMember = 1
+GROUP BY GenderID
+ORDER BY AvgEstimatedSalary DESC
+LIMIT 1;
+
+-- Segment the customers based on their credit score and identify the segment with the highest exit rate. (SQL)
+
+WITH credit_segments AS (
+  SELECT
+    CASE
+      WHEN CreditScore < 300 THEN 'Poor'
+      WHEN CreditScore >= 300 AND CreditScore < 580 THEN 'Fair'
+      WHEN CreditScore >= 580 AND CreditScore < 670 THEN 'Good'
+      WHEN CreditScore >= 670 AND CreditScore < 740 THEN 'Very Good'
+      ELSE 'Excellent'
+    END AS CreditSegment,
+    Count(*) AS TotalCustomers,
+    SUM(CASE WHEN IsActiveMember = 0 THEN 1 ELSE 0 END) AS ExitedCustomers
+  FROM capstones
+  GROUP BY CreditSegment
+)
+SELECT CreditSegment,
+  ROUND(CAST(ExitedCustomers AS FLOAT) / TotalCustomers * 100, 2) AS ExitRate
+FROM credit_segments
+ORDER BY ExitRate DESC
+LIMIT 1;
+
+
+-- Find out which geographic region has the highest number of active customers with a tenure greater than 5 years. (SQL)
+SELECT GeographyID, COUNT(*) AS NumActiveCustomers
+FROM capstones
+WHERE IsActiveMember = 1
+AND Tenure > 5
+GROUP BY GeographyID
+ORDER BY NumActiveCustomers DESC
+LIMIT 3;
+
+-- out the gender wise average income of male and female in each geography id. Also rank the gender according to the average value. (SQL)
+
+WITH ranked_income AS (
+  SELECT
+    ri.GeographyID,
+    ri.GenderID,
+    ri.AvgIncome,
+    ROW_NUMBER() OVER (PARTITION BY ri.GeographyID ORDER BY ri.AvgIncome DESC) AS GenderRank
+  FROM (
+    SELECT
+      GenderID,
+      GeographyID,
+      AVG(EstimatedSalary) AS AvgIncome
+    FROM capstones
+    WHERE IsActiveMember = 1
+    GROUP BY GenderID, GeographyID
+  ) AS ri
+)
+SELECT
+  ri.GeographyID,
+  CASE
+    WHEN ri.GenderRank = 1 THEN 'Male'
+    WHEN ri.GenderRank = 2 THEN 'Female'
+    ELSE 'N/A'
+  END AS Gender,
+  ri.AvgIncome,
+  ri.GenderRank
+FROM ranked_income AS ri
+ORDER BY ri.GeographyID, ri.GenderRank;
+
+-- write a query to find out the average tenure of the people who have exited in each age bracket (18-30, 30-50, 50+).
+SELECT
+  CASE
+    WHEN Age BETWEEN 18 AND 30 THEN '18-30'
+    WHEN Age BETWEEN 31 AND 50 THEN '31-50'
+    ELSE '50+'
+  END AS AgeBracket,
+  AVG(Tenure) AS AvgTenure
+FROM capstones
+WHERE IsActiveMember = 0
+GROUP BY AgeBracket
+ORDER BY AgeBracket ASC;
+
+
+
+
+
+
+
+
+
+
+
+
+
